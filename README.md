@@ -2,7 +2,10 @@
 
 Outil **100 % local** (un dossier statique, aucun serveur, aucune installation) qui transforme un questionnaire d'évaluation de maturité Excel en **plan d'action** priorisé, exportable en Excel.
 
-> Double-cliquez sur `index.html` : l'outil s'ouvre dans Chrome, Edge ou Firefox, même hors ligne.
+## Ouvrir l'outil
+
+- **Le plus simple : `plan-d-action.html`**, la version en **un seul fichier** (styles, scripts et librairies intégrés). Elle fonctionne même copiée seule, envoyée par e-mail ou déposée sur SharePoint / OneDrive / Teams (téléchargez-la avant de l'ouvrir). Double-cliquez : elle s'ouvre dans Edge, Chrome ou Firefox, même hors ligne.
+- **Version dossier : `index.html`**, qui doit rester à côté des dossiers `css/`, `js/` et `vendor/`. Si vous recevez un zip, **extrayez-le d'abord** (clic droit > *Extraire tout*) : ouvrir `index.html` directement depuis le zip ne charge ni les styles ni les fonctions. Dans ce cas, la page affiche un message d'aide.
 
 ## Ce que fait l'outil
 
@@ -57,7 +60,8 @@ Les erreurs indiquent l'opération, le fournisseur, le modèle, le statut HTTP, 
 ## Structure
 
 ```
-index.html            interface
+plan-d-action.html    version fichier unique, générée par tools/build-single.js
+index.html            interface (version dossier)
 css/app.css
 js/                   logique (scripts classiques, compatibles file://)
   importer.js maturity.js matcher.js referential.js planBuilder.js exporter.js aiAssist.js app.js
@@ -66,14 +70,16 @@ vendor/               xlsx-js-style 1.2.0 (Apache-2.0), pdf.js 3.11.174 (Apache-
 proxy/                proxy CORS optionnel (Node, sans dépendance)
 sample/               données fictives + script de génération
 tests/                tests unitaires (node --test) et test de bout en bout Playwright
+tools/                script de génération du fichier unique
 ```
 
 ## Développement
 
 ```bash
-npm test                 # tests unitaires, aucune dépendance (Node 18+)
-npm run test:e2e         # test Chromium sur file:// (nécessite le paquet playwright)
+npm run build            # régénère plan-d-action.html (fichier unique) après toute modification
+npm test                 # tests unitaires + vérifie que plan-d-action.html est à jour (Node 18+)
+npm run test:e2e         # test Chromium sur file://, version dossier et fichier unique (paquet playwright)
 node sample/generate-sample.js
 ```
 
-Aucune étape de build : les fichiers sont servis tels quels.
+La version dossier n'a pas d'étape de build ; `npm run build` ne sert qu'à produire le fichier unique.

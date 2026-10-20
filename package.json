@@ -4,8 +4,9 @@
   "private": true,
   "description": "Générateur local de plan d'action à partir de questionnaires de maturité cybersécurité (aucune dépendance d'exécution).",
   "scripts": {
-    "test": "node --test tests/unit.test.js tests/llmClient.test.js",
-    "test:e2e": "node tests/e2e.smoke.mjs",
+    "build": "node tools/build-single.js",
+    "test": "node --test tests/unit.test.js tests/llmClient.test.js && node tools/build-single.js --check",
+    "test:e2e": "node tests/e2e.smoke.mjs && PDA_E2E_PAGE=plan-d-action.html node tests/e2e.smoke.mjs",
     "proxy": "node proxy/strict-proxy.mjs"
   },
   "license": "UNLICENSED"

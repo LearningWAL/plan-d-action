@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>Plan d'action maturité</title>
+  <style>.ico{width:18px;height:18px}</style>
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -320,5 +321,24 @@
   <script src="js/aiAssist.js"></script>
   <script src="js/exporter.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    // Shown when the page is opened without its css/, js/ and vendor/ folders
+    // (file opened from inside a zip, or copied/downloaded alone).
+    (function () {
+      var cssMissing = getComputedStyle(document.body).backgroundColor !== 'rgb(6, 16, 30)';
+      if (window.PDA && window.PDA.app && !cssMissing) return;
+      var box = document.createElement('div');
+      box.setAttribute('role', 'alert');
+      box.style.cssText = 'position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;padding:16px;background:#06101e;font:15px/1.5 system-ui,sans-serif;color:#e8f1fc';
+      box.innerHTML = '<div style="max-width:620px;background:#0f1a2b;border:1px solid #38bdf8;border-radius:12px;padding:24px">' +
+        '<h1 style="font-size:20px;margin:0 0 12px">Fichiers de l\'outil introuvables</h1>' +
+        '<p style="margin:0 0 12px">Cette page a été ouverte sans les dossiers <b>css</b>, <b>js</b> et <b>vendor</b> qui l\'accompagnent : les styles et les fonctions ne peuvent pas se charger.</p>' +
+        '<p style="margin:0 0 8px">Pour corriger :</p><ul style="margin:0 0 12px;padding-left:20px">' +
+        '<li>ouvrez <b>plan-d-action.html</b> (version en un seul fichier, fonctionne même copiée seule) ;</li>' +
+        '<li>ou extrayez l\'archive complète (clic droit &gt; <i>Extraire tout</i>) puis ouvrez <b>index.html</b> depuis le dossier extrait ;</li>' +
+        '<li>depuis SharePoint, OneDrive ou Teams : téléchargez le fichier sur votre poste avant de l\'ouvrir.</li></ul></div>';
+      document.body.appendChild(box);
+    })();
+  </script>
 </body>
 </html>

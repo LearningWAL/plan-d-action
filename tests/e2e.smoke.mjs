@@ -56,7 +56,7 @@ await context.route('https://api.openai.com/**', async (route) => {
   return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ situation_actuelle: 'Synthèse IA.', maturite_estimee: 1, justification_maturite: 'ok', mesures: ['Mesure IA 1', 'Mesure IA 2'], effort: 'Moyen', justification_priorite: 'car' }) } }] }) });
 });
 
-await page.goto(pathToFileURL(path.join(ROOT, 'index.html')).href);
+await page.goto(pathToFileURL(path.resolve(ROOT, process.env.PDA_E2E_PAGE || 'index.html')).href);
 assert.equal(await page.title(), 'Plan d\'action maturité');
 
 // 1. Questionnaire

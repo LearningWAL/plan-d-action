@@ -85,6 +85,14 @@
 
   let pdfReady = null;
   function loadScript(src) {
+    // Single-file build: the library is embedded as an inert block and executed on demand.
+    const inline = document.getElementById(src.endsWith('pdf.worker.min.js') ? 'pda-inline-pdfjs-worker' : 'pda-inline-pdfjs');
+    if (inline) {
+      const s = document.createElement('script');
+      s.textContent = inline.textContent;
+      document.head.appendChild(s);
+      return Promise.resolve();
+    }
     return new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = src;
