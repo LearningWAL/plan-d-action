@@ -60,8 +60,43 @@
   }
 
   function switchTab(name) {
-    document.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.stepper [data-tab]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.tab === name);
+      b.setAttribute('aria-selected', String(b.dataset.tab === name));
+    });
     document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'tab-' + name));
+    g.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Marks completed steps in the stepper.
+  function updateSteps() {
+    const done = {
+      questionnaire: !!(state.questionnaire && state.questionnaire.records.length && !PDA.importer.validateMapping(state.mapping).length),
+      referentials: state.referentials.some((r) => r.enabled),
+      settings: state.actions.length > 0,
+      plan: state.actions.length > 0 && state.actions.some((a) => a.owner || a.dueDate || a.status !== PDA.planBuilder.STATUSES[0]),
+      ai: !!(lastTest && lastTest.ok && lastTest.sig === configSig())
+    };
+    document.querySelectorAll('.stepper [data-tab]').forEach((b) => b.setAttribute('data-done', String(!!done[b.dataset.tab])));
+  }
+
+  // Drag-and-drop onto the file zones feeds the underlying <input type=file>.
+  function initDropzones() {
+    document.querySelectorAll('.dropzone[data-drop]').forEach((zone) => {
+      const input = $(zone.dataset.drop);
+      const over = (on) => (e) => { e.preventDefault(); zone.classList.toggle('is-over', on); };
+      zone.addEventListener('dragenter', over(true));
+      zone.addEventListener('dragover', over(true));
+      zone.addEventListener('dragleave', over(false));
+      zone.addEventListener('drop', (e) => {
+        over(false)(e);
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (!files || !files.length) return;
+        if (input.multiple) input.files = files;
+        else { const dt = new DataTransfer(); dt.items.add(files[0]); input.files = dt.files; }
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
   }
 
   // ---------- 1. Questionnaire ----------
@@ -123,16 +158,18 @@
 
   function renderMapping() {
     const m = state.mapping;
-    $('q-mapping').innerHTML = PDA.importer.FIELDS.map((f) => {
+    const fields = PDA.importer.FIELDS.filter((f) => !f.multi).concat(PDA.importer.FIELDS.filter((f) => f.multi));
+    $('q-mapping').innerHTML = fields.map((f) => {
       if (f.multi) {
         const boxes = state.questionnaire.headers.map((h, i) =>
           '<label><input type="checkbox" data-map="' + f.key + '" value="' + i + '"' + ((m[f.key] || []).includes(i) ? ' checked' : '') + '> ' + esc(h) + '</label>').join('');
-        return '<div><label>' + esc(f.label) + '</label><div class="multi">' + boxes + '</div></div>';
+        return '<div class="field-multi"><span class="field-label">' + esc(f.label) + ' <span class="field-help">(une ou plusieurs colonnes)</span></span><div class="multi">' + boxes + '</div></div>';
       }
       return '<label>' + esc(f.label) + '<select data-map="' + f.key + '">' + headerOptions(m[f.key]) + '</select></label>';
     }).join('');
     $('q-mapping-errors').textContent = PDA.importer.validateMapping(m).join(' ');
     renderPreview();
+    updateSteps();
   }
 
   function renderPreview() {
@@ -162,6 +199,7 @@
     rememberMapping();
     $('q-mapping-errors').textContent = PDA.importer.validateMapping(state.mapping).join(' ');
     renderPreview();
+    updateSteps();
     persistProject();
   }
 
@@ -232,15 +270,16 @@
 
   function renderReferentials() {
     const refs = state.referentials;
+    updateSteps();
     if (!refs.length) {
-      $('ref-list').innerHTML = '<p class="muted">Aucun référentiel : les mesures proviendront de la colonne recommandation du questionnaire.</p>';
+      $('ref-list').innerHTML = '<p class="muted">Aucun référentiel pour l\'instant : les mesures proviendront de la colonne recommandation du questionnaire. Cette étape est facultative.</p>';
       return;
     }
     $('ref-list').innerHTML = '<div class="table-wrap"><table class="table"><thead><tr><th>Actif</th><th>Nom</th><th>Type</th><th>Mesures / extraits</th><th>Aperçu</th><th></th></tr></thead><tbody>' +
       refs.map((r) => '<tr><td><input type="checkbox" data-ref-toggle="' + r.id + '"' + (r.enabled ? ' checked' : '') + ' aria-label="Activer"></td>' +
         '<td>' + esc(r.name) + '</td><td>' + (r.type === 'pdf' ? 'PDF' : 'Catalogue') + '</td><td>' + r.measures.length + '</td>' +
         '<td class="small">' + r.measures.slice(0, 3).map((m) => esc(T.truncate(m.title || m.text, 90))).join('<br>') + '</td>' +
-        '<td><button class="btn btn-ghost" data-ref-del="' + r.id + '" type="button">Retirer</button></td></tr>').join('') +
+        '<td><button class="btn btn-danger-ghost" data-ref-del="' + r.id + '" type="button">Retirer</button></td></tr>').join('') +
       '</tbody></table></div>';
   }
 
@@ -312,9 +351,10 @@
     $('f-domain').innerHTML = '<option value="">Tous</option>' + domains.map((d) => '<option' + (d === cur ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
     const s = PDA.planBuilder.summary(actions);
     $('plan-summary').innerHTML = actions.length ? [
-      ['Actions', s.total], ['P1', s.byPriority.P1], ['P2', s.byPriority.P2], ['P3', s.byPriority.P3], ['Quick wins', s.quickWins],
-      ['Sélection', selection.size]
-    ].map(([l, v]) => '<div class="stat"><b>' + v + '</b>' + l + '</div>').join('') : '';
+      ['Actions', s.total, ''], ['Priorité P1', s.byPriority.P1, 'kpi-p1'], ['Priorité P2', s.byPriority.P2, 'kpi-p2'], ['Priorité P3', s.byPriority.P3, 'kpi-p3'],
+      ['Quick wins', s.quickWins, 'kpi-qw'], ['Sélectionnées', selection.size, 'kpi-sel']
+    ].map(([l, v, c]) => '<div class="kpi ' + c + '"><b>' + v + '</b><span>' + l + '</span></div>').join('') : '';
+    updateSteps();
     const rows = filteredActions();
     const levels = Array.from({ length: state.settings.scaleMax + 1 }, (_, i) => i);
     const head = '<thead><tr><th><input type="checkbox" id="sel-all" aria-label="Tout sélectionner"' + (rows.length && rows.every((a) => selection.has(a.uid)) ? ' checked' : '') + '></th>' +
@@ -377,7 +417,7 @@
     } else {
       a[f] = el.value;
     }
-    if (e.type === 'change' && el.tagName === 'SELECT') renderPlan();
+    if (e.type === 'change' && el.tagName === 'SELECT') renderPlan(); else updateSteps();
     persistProject();
   }
 
@@ -464,8 +504,10 @@
     pill.className = 'pill ' + cls;
     pill.textContent = text;
     $('ai-enrich').disabled = !aiAuthorized || aiBusy;
+    $('ai-enrich').title = aiAuthorized ? 'Envoyer les lignes cochées au fournisseur d\'IA (avec approbation)' : 'Cochez d\'abord l\'autorisation dans Paramètres IA';
     $('ai-test').disabled = aiBusy;
     $('ai-load-models').disabled = aiBusy;
+    updateSteps();
   }
 
   function aiMessage(text, kind) {
@@ -521,6 +563,7 @@
       return;
     }
     aiBusy = true; renderAiStatus('IA : chargement des modèles…');
+    $('ai-load-models').setAttribute('aria-busy', 'true');
     try {
       const r = await client.getAvailableModels();
       if (r.source === 'api') {
@@ -532,6 +575,7 @@
       }
       if (!state.ai.model && r.models.length) { state.ai.model = r.models[0]; saveAiPrefs(); }
     } finally {
+      $('ai-load-models').removeAttribute('aria-busy');
       aiBusy = false; renderAi();
     }
   }
@@ -540,6 +584,7 @@
     const sig = configSig();
     aiBusy = true; renderAiStatus('IA : test en cours…');
     aiMessage('Test en cours…');
+    $('ai-test').setAttribute('aria-busy', 'true');
     try {
       const r = await client.testConnection();
       lastTest = { sig, ok: true };
@@ -549,6 +594,7 @@
       lastTest = { sig, ok: false };
       aiMessage(e.toUserMessage ? e.toUserMessage() : PDA.llmErrors.redact(e.message), 'error');
     } finally {
+      $('ai-test').removeAttribute('aria-busy');
       aiBusy = false; renderAi();
     }
   }
@@ -648,12 +694,15 @@
     const saved = readJson('sessionStorage', PROJECT_KEY);
     if (saved && saved.app === 'plan-d-action') { PDA.secrets.stripKeys(saved); applyProject(saved); } else renderAll();
 
-    document.querySelector('.tabs').addEventListener('click', (e) => { if (e.target.dataset.tab) switchTab(e.target.dataset.tab); });
+    document.querySelector('.stepper').addEventListener('click', (e) => { const t = e.target.closest('[data-tab]'); if (t) switchTab(t.dataset.tab); });
+    document.addEventListener('click', (e) => { const t = e.target.closest('[data-goto]'); if (t) switchTab(t.dataset.goto); });
+    initDropzones();
     $('q-file').addEventListener('change', (e) => { if (e.target.files[0]) onQuestionnaireFile(e.target.files[0]); });
     $('q-sheet').addEventListener('change', (e) => loadSheet(e.target.value, true));
     $('q-header').addEventListener('change', (e) => applyHeader(Math.max(0, Number(e.target.value) - 1)));
     $('q-mapping').addEventListener('change', onMappingChange);
     $('q-next').addEventListener('click', () => switchTab('referentials'));
+    $('ref-next').addEventListener('click', () => switchTab('settings'));
 
     $('ref-file').addEventListener('change', (e) => { if (e.target.files.length) onRefFiles(e.target.files); });
     $('ref-sheet').addEventListener('change', () => loadRefSheet(true));
