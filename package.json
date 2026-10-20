@@ -1,0 +1,12 @@
+{
+  "name": "plan-d-action",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Générateur local de plan d'action à partir de questionnaires de maturité cybersécurité (aucune dépendance d'exécution).",
+  "scripts": {
+    "test": "node --test tests/unit.test.js tests/llmClient.test.js",
+    "test:e2e": "node tests/e2e.smoke.mjs",
+    "proxy": "node proxy/strict-proxy.mjs"
+  },
+  "license": "UNLICENSED"
+}

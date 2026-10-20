@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Plan d'action maturité</title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>Plan d'action <span>évaluation de maturité cyber</span></h1>
+      <span class="badge badge-local" title="Aucun serveur : toutes les données restent dans ce navigateur, sauf appel IA approuvé.">100 % local</span>
+    </div>
+    <div class="topbar-actions">
+      <span id="ai-pill" class="pill pill-off" title="État de la couche IA">IA : non configurée</span>
+      <label class="btn btn-ghost" for="project-file">Ouvrir un projet</label>
+      <input id="project-file" type="file" accept=".json,application/json" hidden>
+      <button id="save-project" class="btn btn-ghost" type="button">Enregistrer le projet</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="questionnaire" class="active">1. Questionnaire</button>
+    <button role="tab" data-tab="referentials">2. Référentiels</button>
+    <button role="tab" data-tab="settings">3. Paramètres</button>
+    <button role="tab" data-tab="plan">4. Plan d'action</button>
+    <button role="tab" data-tab="ai">Paramètres IA</button>
+  </nav>
+
+  <main>
+    <!-- 1. Questionnaire -->
+    <section id="tab-questionnaire" class="panel active">
+      <div class="card">
+        <h2>Importer le questionnaire d'évaluation</h2>
+        <p class="hint">Fichier Excel (.xlsx, .xls) ou CSV. Le fichier est lu localement, rien n'est envoyé.</p>
+        <input id="q-file" type="file" accept=".xlsx,.xlsm,.xls,.csv">
+        <div id="q-meta" class="row hidden">
+          <label>Feuille <select id="q-sheet"></select></label>
+          <label>Ligne d'en-tête <input id="q-header" type="number" min="1" value="1"></label>
+          <span id="q-count" class="muted"></span>
+        </div>
+      </div>
+      <div id="q-mapping-card" class="card hidden">
+        <h2>Correspondance des colonnes</h2>
+        <p class="hint">Proposition automatique à vérifier. Les commentaires servent à décrire la situation actuelle et à estimer la maturité.</p>
+        <div id="q-mapping" class="mapping-grid"></div>
+        <div id="q-mapping-errors" class="errors"></div>
+        <h3>Aperçu</h3>
+        <div class="table-wrap"><table id="q-preview" class="table small"></table></div>
+        <div class="actions-row"><button id="q-next" class="btn" type="button">Continuer vers les référentiels →</button></div>
+      </div>
+    </section>
+
+    <!-- 2. Referentials -->
+    <section id="tab-referentials" class="panel">
+      <div class="card">
+        <h2>Documents de référence des mesures (optionnel)</h2>
+        <p class="hint">Catalogue de mesures en Excel/CSV (ex. mesures ISO 27002, guide d'hygiène ANSSI, politique interne) ou documents PDF. Les mesures sont rapprochées localement des exigences (similarité TF-IDF).</p>
+        <input id="ref-file" type="file" accept=".xlsx,.xls,.csv,.pdf" multiple>
+        <div id="ref-progress" class="muted"></div>
+      </div>
+      <div id="ref-mapping-card" class="card hidden">
+        <h2>Colonnes du catalogue <span id="ref-mapping-name" class="muted"></span></h2>
+        <div class="row">
+          <label>Feuille <select id="ref-sheet"></select></label>
+          <label>Ligne d'en-tête <input id="ref-header" type="number" min="1" value="1"></label>
+        </div>
+        <div id="ref-mapping" class="mapping-grid"></div>
+        <div class="actions-row">
+          <button id="ref-add" class="btn" type="button">Ajouter ce référentiel</button>
+          <button id="ref-cancel" class="btn btn-ghost" type="button">Annuler</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Référentiels chargés</h2>
+        <div id="ref-list"><p class="muted">Aucun référentiel : les mesures proviendront de la colonne recommandation du questionnaire.</p></div>
+      </div>
+    </section>
+
+    <!-- 3. Settings -->
+    <section id="tab-settings" class="panel">
+      <div class="card">
+        <h2>Paramètres de génération</h2>
+        <div class="form-grid">
+          <label>Niveau maximum de l'échelle <input id="s-scaleMax" type="number" min="1" max="10"></label>
+          <label>Maturité cible <input id="s-target" type="number" min="0" max="10"></label>
+          <label>Niveau par défaut si indéterminable <input id="s-unknownLevel" type="number" min="0" max="10"></label>
+          <label>Source des mesures
+            <select id="s-measureSource">
+              <option value="both">Recommandation + référentiels</option>
+              <option value="reco">Colonne recommandation uniquement</option>
+              <option value="ref">Référentiels uniquement</option>
+            </select>
+          </label>
+          <label>Mesures de référentiel par exigence <input id="s-topK" type="number" min="1" max="5"></label>
+          <label>Seuil de pertinence (0-1) <input id="s-threshold" type="number" min="0" max="1" step="0.01"></label>
+          <label class="check"><input id="s-includeCompliant" type="checkbox"> Inclure les exigences déjà au niveau cible (action « maintenir »)</label>
+        </div>
+        <div id="s-scale" class="scale"></div>
+        <div class="actions-row"><button id="generate" class="btn btn-primary" type="button">Générer le plan d'action</button></div>
+        <div id="generate-errors" class="errors"></div>
+      </div>
+    </section>
+
+    <!-- 4. Plan -->
+    <section id="tab-plan" class="panel">
+      <div class="card">
+        <div class="toolbar">
+          <div class="row">
+            <label>Priorité <select id="f-priority"><option value="">Toutes</option><option>P1</option><option>P2</option><option>P3</option></select></label>
+            <label>Domaine <select id="f-domain"><option value="">Tous</option></select></label>
+            <label>Recherche <input id="f-search" type="search" placeholder="Texte…"></label>
+            <label class="check"><input id="f-quickwin" type="checkbox"> Quick wins</label>
+          </div>
+          <div class="row">
+            <button id="ai-enrich" class="btn" type="button" title="Nécessite l'autorisation dans Paramètres IA">Enrichir la sélection avec l'IA</button>
+            <button id="export-xlsx" class="btn btn-primary" type="button">Exporter en Excel</button>
+          </div>
+        </div>
+        <div id="plan-summary" class="summary"></div>
+        <div id="ai-progress" class="muted"></div>
+        <div class="table-wrap"><table id="plan-table" class="table plan"></table></div>
+        <p id="plan-empty" class="muted">Générez le plan depuis l'onglet Paramètres.</p>
+      </div>
+    </section>
+
+    <!-- 5. AI settings -->
+    <section id="tab-ai" class="panel">
+      <div class="card">
+        <h2>Paramètres IA (optionnel)</h2>
+        <p class="hint">L'outil fonctionne entièrement sans IA. L'IA peut reformuler la situation actuelle et proposer des mesures à partir des extraits de référentiel. Chaque envoi affiche les données transmises et demande votre approbation.</p>
+        <label class="check consent-box"><input id="ai-authorized" type="checkbox"> <strong>Je confirme que l'usage de l'IA est autorisé pour ce contenu et conforme aux règles du client.</strong></label>
+        <div class="form-grid">
+          <label>Fournisseur <select id="ai-provider"></select></label>
+          <label data-field="azureMode">Mode Azure
+            <select id="ai-azureMode">
+              <option value="openai">Azure OpenAI (déploiement)</option>
+              <option value="foundry">Azure AI Foundry (inférence de modèles)</option>
+            </select>
+          </label>
+          <label data-field="endpoint">Endpoint Azure (HTTPS) <input id="ai-endpoint" type="url" placeholder="https://mon-ressource.openai.azure.com" autocomplete="off" spellcheck="false"></label>
+          <label data-field="baseUrl">URL de base <input id="ai-baseUrl" type="url" placeholder="https://…/v1" autocomplete="off" spellcheck="false"></label>
+          <label data-field="deployment">Déploiement <input id="ai-deployment" type="text" autocomplete="off" spellcheck="false"></label>
+          <label data-field="apiVersion">Version d'API <input id="ai-apiVersion" type="text" placeholder="2024-10-21" autocomplete="off"></label>
+          <label data-field="apiKey">Clé API
+            <input id="ai-apiKey" type="password" autocomplete="new-password" spellcheck="false">
+            <span id="ai-key-state" class="muted small"></span>
+          </label>
+          <label data-field="apiKey" class="check"><input id="ai-remember" type="checkbox"> Mémoriser cette clé sur ce navigateur</label>
+          <label data-field="model">Modèle
+            <span class="inline">
+              <input id="ai-model" type="text" list="ai-models" autocomplete="off" spellcheck="false">
+              <button id="ai-load-models" class="btn btn-ghost" type="button">Charger les modèles</button>
+            </span>
+            <datalist id="ai-models"></datalist>
+            <span id="ai-models-state" class="muted small"></span>
+          </label>
+        </div>
+        <details>
+          <summary>Options avancées</summary>
+          <div class="form-grid">
+            <label>Proxy local optionnel (CORS) <input id="ai-proxyUrl" type="url" placeholder="http://127.0.0.1:8787" autocomplete="off"></label>
+            <label class="check"><input id="ai-pseudonymize" type="checkbox" checked> Pseudonymiser avant envoi (e-mails, IP, téléphones, hôtes internes)</label>
+            <label>Termes à masquer (nom du client, sites…, séparés par des virgules) <input id="ai-terms" type="text" autocomplete="off"></label>
+          </div>
+        </details>
+        <div class="actions-row">
+          <button id="ai-test" class="btn" type="button">Tester la connexion</button>
+          <button id="ai-clear-keys" class="btn btn-danger" type="button">Effacer les clés API</button>
+        </div>
+        <div id="ai-message" class="message" role="status"></div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="consent-dialog" class="dialog">
+    <h2>Approuver l'envoi à un fournisseur d'IA</h2>
+    <dl class="kv">
+      <dt>Opération</dt><dd data-c="operation"></dd>
+      <dt>Fournisseur</dt><dd data-c="provider"></dd>
+      <dt>Modèle</dt><dd data-c="model"></dd>
+      <dt>Destination</dt><dd data-c="host"></dd>
+      <dt>Nombre de requêtes</dt><dd data-c="count"></dd>
+      <dt>Volume total envoyé</dt><dd><span data-c="chars"></span> caractères</dd>
+    </dl>
+    <p class="small">Aperçu exact du contenu envoyé (première requête) :</p>
+    <pre data-c="preview" class="preview"></pre>
+    <div class="actions-row">
+      <button data-c="cancel" class="btn btn-ghost" type="button">Annuler</button>
+      <button data-c="approve" class="btn btn-primary" type="button">Approuver l'envoi</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="alert" hidden></div>
+
+  <script src="vendor/xlsx-js-style/xlsx.min.js"></script>
+  <script src="js/text.js"></script>
+  <script src="js/importer.js"></script>
+  <script src="js/maturity.js"></script>
+  <script src="js/matcher.js"></script>
+  <script src="js/referential.js"></script>
+  <script src="js/planBuilder.js"></script>
+  <script src="js/llm/errors.js"></script>
+  <script src="js/llm/providers.js"></script>
+  <script src="js/llm/secrets.js"></script>
+  <script src="js/llm/validation.js"></script>
+  <script src="js/llm/consent.js"></script>
+  <script src="js/llm/llmClient.js"></script>
+  <script src="js/aiAssist.js"></script>
+  <script src="js/exporter.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
